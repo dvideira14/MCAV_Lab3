@@ -1,0 +1,36 @@
+% Parâmetros fornecidos
+pe = [0 0 -26]; % Posição [m]
+ve = [0 0 0];   % Velocidade [m/s]
+lambda_e = [0 0 0]; % Ângulos de Euler [graus]
+omega_e = [0 0 0];  % Velocidade angular [rad/s]
+g = 3.721; % Gravidade em Marte [m/s^2]
+rho = 0.0139; % Densidade do ar em Marte [kg/m^3]
+A_area = 13.29; % Área de arrasto [m^2]
+m = 2207.6; % Massa [kg]
+Cd = 1.6; % Coeficiente de arrasto
+
+% Submatrizes
+I3 = eye(3); % Matriz identidade 3x3
+Z3 = zeros(3); % Matriz zero 3x3
+
+% Matriz de gravidade
+Gravity = [0, g, 0; -g, 0, 0; 0, 0, 0];
+
+% Construção da matriz A corrigida
+A = [Z3, I3, Z3, Z3;
+     Z3, Z3, Gravity, Z3;
+     Z3, Z3, Z3, I3;
+     Z3, Z3, Z3, Z3];
+
+% Decomposição SVD
+[U, Sigma, V] = svd(A);
+
+% Exibição dos resultados
+disp('Matriz U:');
+disp(U);
+
+disp('Matriz Sigma:');
+disp(Sigma);
+
+disp('Matriz V^H:');
+disp(V');

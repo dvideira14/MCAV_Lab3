@@ -1,0 +1,46 @@
+% Parâmetros atualizados
+pe = [0, 0, -1050]; % Posição
+ve = [0, 0, 44.5];  % Velocidade
+lambda_e = [0, 0, 0]; % Ângulos de Euler
+omega_e = [0, 0, 0];  % Velocidade angular
+g = 3.721;           % Gravidade em Marte (m/s^2)
+rho = 0.0139;        % Densidade do ar em Marte (kg/m^3)
+A_area = 13.29;      % Área (m^2)
+m = 2207.6;          % Massa (kg)
+Cd = 1.6;            % Coeficiente de arrasto
+
+% Submatrizes
+I3 = eye(3);
+Z3 = zeros(3);
+
+% Matriz -S(ve)
+S_ve = [0, -ve(3), ve(2); ve(3), 0, -ve(1); -ve(2), ve(1), 0];
+neg_S_ve = -S_ve;
+
+% Matriz de gravidade
+Gravity = [0, g, 0; -g, 0, 0; 0, 0, 0];
+
+% Matriz de arrasto
+vze = ve(3);
+Drag = [0, 0, 0; 0, 0, 0; 0, 0, -(1/m)*Cd*rho*A_area*vze^2];
+
+% Construção da matriz A
+A = [Z3, I3, neg_S_ve, Z3;
+     Z3, Drag, Gravity, S_ve;
+     Z3, Z3, Z3, I3;
+     Z3, Z3, Z3, Z3];
+
+% Cálculo da SVD
+[U, Sigma_small, V] = svd(A);
+
+% Expandindo Sigma para ser 12x12
+Sigma = zeros(12); % Inicializa matriz 12x12 com zeros
+Sigma(1:size(Sigma_small, 1), 1:size(Sigma_small, 2)) = Sigma_small;
+
+% Exibindo os resultados
+disp('Matriz U:');
+disp(U);
+disp('Matriz Σ (12x12):');
+disp(Sigma);
+disp('Matriz V^H:');
+disp(V');

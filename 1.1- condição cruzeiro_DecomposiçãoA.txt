@@ -1,0 +1,44 @@
+% Dados fornecidos
+g = 3.71; % Gravidade em Marte (m/s^2)
+rho = 0.02; % Densidade do ar em Marte (kg/m^3)
+A_area = 6.69; % Área (m^2)
+m = 1182.6; % Massa (kg)
+Cd = 1.6; % Coeficiente de arrasto
+v_e = [0; 2.4; 0]; % Velocidade (m/s)
+phi = -1.5 * pi / 180; % Ângulo de Euler 
+
+% Matriz R(λe) e Q(λe)
+R_lambda_e = [1, 0, 0; 
+              0, cos(phi), 0; 
+              0, 0, cos(phi)];
+Q_lambda_e = R_lambda_e;
+
+% Matriz S(ve)
+S_ve = [0, -v_e(3), v_e(2);
+        v_e(3), 0, -v_e(1);
+        -v_e(2), v_e(1), 0];
+
+% Matriz A
+A = [zeros(3), R_lambda_e, [0, -v_e(2)*cos(phi), v_e(2)*sin(phi); 
+                            -v_e(2)*sin(phi), 0, 0; 
+                            v_e(2)*cos(phi), 0, 0], zeros(3);
+     zeros(3), [0, 0, 0; 
+                0, -(1/m)*Cd*rho*A_area*v_e(2)^2, 0; 
+                0, 0, 0], ...
+                [0, -g, 0; 
+                -g*cos(phi)+(1/m)*Cd*rho*A_area*v_e(2)^2*cos(phi), 0, 0; 
+                0, 0, 0], ...
+                S_ve;
+     zeros(3), zeros(3), zeros(3), Q_lambda_e;
+     zeros(3), zeros(3), zeros(3), zeros(3)];
+
+% Decomposição SVD
+[U, Sigma, V] = svd(A);
+
+% Resultados
+disp('Matriz U:');
+disp(U);
+disp('Matriz Σ (Sigma):');
+disp(Sigma);
+disp('Matriz V^H:');
+disp(V');

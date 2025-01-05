@@ -1,0 +1,105 @@
+% Design de controlador LQR
+
+% Parâmetros do sistema
+m = 2207.6; % Massa [kg]
+Cd = 1.6; % Coeficiente de arrasto
+A_area = 13.29; % Área frontal [m^2]
+rho = 0.02; % Densidade do ar [kg/m^3]
+g = 3.721; % Gravidade [m/s^2]
+ve = [0; 2.4; 0]; % Velocidade inicial [m/s]
+vye = ve(3); % Componente vertical da velocidade inicial
+phi = -1.5 * pi / 180;
+% Matriz R(λe) e Q(λe)
+R_lambda_e = [1, 0, 0; 
+              0, cos(phi), 0; 
+              0, 0, cos(phi)];
+Q_lambda_e = R_lambda_e;
+
+% Matriz S(ve)
+S_ve = [0, -ve(3), ve(2);
+        ve(3), 0, -ve(1);
+        -ve(2), ve(1), 0];
+
+% Matriz A
+A = [zeros(3), R_lambda_e, [0, -ve(2)*cos(phi), ve(2)*sin(phi); 
+                            -ve(2)*sin(phi), 0, 0; 
+                            ve(2)*cos(phi), 0, 0], zeros(3);
+     zeros(3), [0, 0, 0; 
+                0, -(1/m)*Cd*rho*A_area*ve(2)^2, 0; 
+                0, 0, 0], ...
+                [0, -g, 0; 
+                -g*cos(phi)+(1/m)*Cd*rho*A_area*ve(2)^2*cos(phi), 0, 0; 
+                0, 0, 0], ...
+                S_ve;
+     zeros(3), zeros(3), zeros(3), Q_lambda_e;
+     zeros(3), zeros(3), zeros(3), zeros(3)];
+
+J = diag([1650.17, 1258.86, 2248.96]);
+
+fp1 = [0; sqrt(2)/2 * (-2667); sqrt(2)/2 * (-2667)];
+fp2 = [0; sqrt(2)/2 * (-2667); sqrt(2)/2 * (-2667)];
+fp3 = [0; sqrt(2)/2 * 2667; sqrt(2)/2 * (-2667)];
+fp4 = [0; sqrt(2)/2 * 2667; sqrt(2)/2 * (-2667)];
+
+np1 = [1.84 * sqrt(2)/2 * (-2667); 1.84 * sqrt(2)/2 * 2667; 1.84 * sqrt(2)/2 * (-2667)];
+np2 = [1.84 * sqrt(2)/2 * (-2667); 1.84 * sqrt(2)/2 * (-2667); 1.84 * sqrt(2)/2 * 2667];
+np3 = [1.84 * sqrt(2)/2 * 2667; 1.84 * sqrt(2)/2 * (-2667); 1.84 * sqrt(2)/2 * (-2667)];
+np4 = [1.84 * sqrt(2)/2 * 2667; 1.84 * sqrt(2)/2 * 2667; 1.84 * sqrt(2)/2 * 2667];
+
+Z3x1 = zeros(3, 1);
+B = [Z3x1, Z3x1, Z3x1, Z3x1;
+     fp1/m, fp2/m, fp3/m, fp4/m;
+     Z3x1, Z3x1, Z3x1, Z3x1;
+     inv(J) * np1, inv(J) * np2, inv(J) * np3, inv(J) * np4];
+
+C = eye(4,12);
+
+D = zeros(4,4);
+
+% Definir as matrizes Q e R para o controlador LQR
+Q = diag([10, 10, 15, 5, 5, 8, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]);
+R = diag([1, 1, 1, 1]);
+
+% Calcular o ganho do controlador LQR
+[K, S, e] = lqr(A, B, Q, R);
+
+% Exibir o ganho do controlador
+disp('Ganho do controlador LQR (K):');
+disp(K);
+
+% Simulação do sistema controlado com LQR
+Dt = 0.01;
+t = 0:Dt:30;
+r = 1*(t >= 10); % referência
+NSim = length(t);
+x = zeros(size(A, 1), length(t));;
+u = zeros(size(B, 2), length(t));
+y = zeros(4, NSim);
+x(:,1) = [10; 1; zeros(size(A, 1) - 2, 1)]; % condição inicial
+
+% Estado inicial
+x(:,1) = [10; 1; zeros(size(A, 1) - 2, 1)];
+
+% Loop de simulação
+for k = 1:N-1
+    % Calcular a ação de controle
+    u(:,k) = -K * x(:,k);
+
+    % Atualizar o estado
+    x_dot = A * x(:,k) + B * u(:,k);
+    x(:,k+1) = x(:,k) + Dt * x_dot;
+end
+
+% Plotar os resultados
+figure;
+plot(t, u(1, :), t, u(2, :)); % Apenas duas variáveis de controle relevantes
+grid on;
+xlabel('$$t [s]$$', 'Interpreter', 'latex');
+ylabel('$$u(t)$$', 'Interpreter', 'latex');
+legend('$$u_1$$', '$$u_2$$', 'Interpreter', 'latex');
+
+figure;
+plot(t, x(1, :), t, r, t, x(2, :), t, r); % Variáveis 1 e 2 comparadas com referência
+grid on;
+xlabel('$$t [s]$$', 'Interpreter', 'latex');
+legend('$$y_1$$', '$$r_1$$', '$$y_2$$', '$$r_2$$', 'Interpreter', 'latex');

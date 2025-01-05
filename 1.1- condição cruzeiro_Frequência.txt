@@ -1,0 +1,66 @@
+% Parâmetros
+J = diag([1650.17, 1258.86, 2248.96]);
+g = 3.721; % Gravidade de Marte (m/s^2)
+rho = 0.0139; % Densidade do ar de Marte (kg/m^3)
+A_area = 6.69; % Área transversal (m^2)
+m = 1182.6; % Massa (kg)
+Cd = 1.6; % Coeficiente de arrasto
+ve = [0; 2.4; 0]; % Velocidade inicial
+vye = ve(3);
+phi = -1.5 * pi / 180;
+
+fp1 = [0; sqrt(2)/2 * (-2667); sqrt(2)/2 * (-2667)];
+fp2 = [0; sqrt(2)/2 * (-2667); sqrt(2)/2 * (-2667)];
+fp3 = [0; sqrt(2)/2 * 2667; sqrt(2)/2 * (-2667)];
+fp4 = [0; sqrt(2)/2 * 2667; sqrt(2)/2 * (-2667)];
+
+np1 = [1.84 * sqrt(2)/2 * (-2667); 1.84 * sqrt(2)/2 * 2667; 1.84 * sqrt(2)/2 * (-2667)];
+np2 = [1.84 * sqrt(2)/2 * (-2667); 1.84 * sqrt(2)/2 * (-2667); 1.84 * sqrt(2)/2 * 2667];
+np3 = [1.84 * sqrt(2)/2 * 2667; 1.84 * sqrt(2)/2 * (-2667); 1.84 * sqrt(2)/2 * (-2667)];
+np4 = [1.84 * sqrt(2)/2 * 2667; 1.84 * sqrt(2)/2 * 2667; 1.84 * sqrt(2)/2 * 2667];
+
+% Matriz R(λe) e Q(λe)
+R_lambda_e = [1, 0, 0; 
+              0, cos(phi), 0; 
+              0, 0, cos(phi)];
+Q_lambda_e = R_lambda_e;
+
+% Matriz S(ve)
+S_ve = [0, -ve(3), ve(2);
+        ve(3), 0, -ve(1);
+        -ve(2), ve(1), 0];
+
+% Matriz A
+A = [zeros(3), R_lambda_e, [0, -ve(2)*cos(phi), ve(2)*sin(phi); 
+                            -ve(2)*sin(phi), 0, 0; 
+                            ve(2)*cos(phi), 0, 0], zeros(3);
+     zeros(3), [0, 0, 0; 
+                0, -(1/m)*Cd*rho*A_area*ve(2)^2, 0; 
+                0, 0, 0], ...
+                [0, -g, 0; 
+                -g*cos(phi)+(1/m)*Cd*rho*A_area*ve(2)^2*cos(phi), 0, 0; 
+                0, 0, 0], ...
+                S_ve;
+     zeros(3), zeros(3), zeros(3), Q_lambda_e;
+     zeros(3), zeros(3), zeros(3), zeros(3)];
+
+Z3x1 = zeros(3, 1);
+B = [Z3x1, Z3x1, Z3x1, Z3x1;
+     fp1/m, fp2/m, fp3/m, fp4/m;
+     Z3x1, Z3x1, Z3x1, Z3x1;
+     inv(J) * np1, inv(J) * np2, inv(J) * np3, inv(J) * np4];
+
+C = eye(4, 12);
+D = zeros(4, 4);
+
+% Modelo de espaço de estados
+sys = ss(A, B, C, D);
+
+% Geração do gráfico de valores singulares no domínio da frequência
+figure;
+omega = logspace(-4, 2, 500); % Frequências (rad/s)
+sigma(sys, omega);
+grid on;
+title('Valores Singulares no Domínio da Frequência');
+xlabel('Frequência (rad/s)');
+ylabel('Valores Singulares (dB)');

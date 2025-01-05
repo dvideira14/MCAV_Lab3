@@ -1,0 +1,77 @@
+%% Simulação Uniforme da Descida de um Lander
+% Configuração inicial
+
+% Parâmetros iniciais
+m = 2207.6; % Massa (kg)
+Cd = 1.6; % Coeficiente de arrasto
+A_area = 13.29; % Área frontal (m^2)
+rho = 0.02; % Densidade do ar (kg/m^3)
+g = 3.721; % Gravidade (m/s^2)
+J = diag([5027.77, 4513.67, 3565.88]); % Tensor de inércia
+
+time_step = 0.1; % Passo de tempo (s)
+final_time = 50; % Tempo final (s)
+t = 0:time_step:final_time; % Vetor de tempo
+
+% Posições iniciais dos propulsores
+p1 = [1.83; -1.83; -0.198];
+p2 = [1.83;  1.83; -0.198];
+p3 = [-1.83; -1.83; -0.198];
+p4 = [-1.83;  1.83; -0.198];
+
+% Condições iniciais
+initial_pos_z = -2100; % Posição inicial no eixo Z (m)
+target_pos_z = -26;    % Posição final no eixo Z (m)
+initial_vel_z = 89;    % Velocidade inicial no eixo Z (m/s)
+final_vel_z = 0;       % Velocidade final no eixo Z (m/s)
+
+% Posição inicial geral
+pos = [0; 0; initial_pos_z]; % Posição inicial (m)
+vel = [0; 0; initial_vel_z]; % Velocidade inicial (m/s)
+att = [0; 0; 0];             % Ângulos de Euler iniciais
+omega = [0; 0; 0];           % Velocidade angular inicial
+
+% Interpolação linear para posição e velocidade no eixo Z
+z_pos = linspace(initial_pos_z, target_pos_z, length(t));
+z_vel = linspace(initial_vel_z, final_vel_z, length(t));
+
+% Histórico de estados
+pos_hist = zeros(3, length(t));
+vel_hist = zeros(3, length(t));
+
+% Simulação
+for i = 1:length(t)
+    % Atualizar histórico de posição e velocidade
+    pos(3) = z_pos(i); % Atualizar posição Z de forma uniforme
+    vel(3) = z_vel(i); % Atualizar velocidade Z de forma uniforme
+
+    pos_hist(:, i) = pos;
+    vel_hist(:, i) = vel;
+
+    % Atualizar orientação
+    torque = cross(p1, [0; 0; T]) + cross(p2, [0; 0; T]) + cross(p3, [0; 0; T]) + cross(p4, [0; 0; T]);
+    omega_dot = J \ torque;
+    omega = omega + omega_dot * time_step;
+    att = att + omega * time_step;
+end
+
+%% Ajustar orientação do eixo Z positivo para baixo
+pos_hist(3, :) = -pos_hist(3, :);
+
+%% Gráficos
+figure;
+plot3(pos_hist(1, :), pos_hist(2, :), pos_hist(3, :));
+xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
+title('Trajetória 3D do Lander'); grid on;
+
+figure;
+subplot(3, 1, 1); plot(t, pos_hist(1, :)); xlabel('Tempo (s)'); ylabel('Posição X (m)');
+subplot(3, 1, 2); plot(t, pos_hist(2, :)); xlabel('Tempo (s)'); ylabel('Posição Y (m)');
+subplot(3, 1, 3); plot(t, pos_hist(3, :)); xlabel('Tempo (s)'); ylabel('Posição Z (m)');
+title('Posição vs. Tempo');
+
+figure;
+subplot(3, 1, 1); plot(t, vel_hist(1, :)); xlabel('Tempo (s)'); ylabel('Velocidade X (m/s)');
+subplot(3, 1, 2); plot(t, vel_hist(2, :)); xlabel('Tempo (s)'); ylabel('Velocidade Y (m/s)');
+subplot(3, 1, 3); plot(t, vel_hist(3, :)); xlabel('Tempo (s)'); ylabel('Velocidade Z (m/s)');
+title('Velocidade vs. Tempo');

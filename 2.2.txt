@@ -1,0 +1,125 @@
+% Parâmetros do sistema
+m_lander = 2207.6; % Massa total inicial (kg)
+m_rover = 1025; % Massa do Rover (kg)
+g = 3.72; % Gravidade em Marte (m/s^2)
+T = 2667; % Thrust individual inicial (N)
+rho = 0.02; % Densidade do ar em Marte (kg/m^3)
+A = 4; % Área frontal do lander (m^2)
+Cd = 1.5; % Coeficiente de arrasto
+
+% Matriz de inércia inicial
+J = diag([5027.77, 4513.67, 3565.88]);
+
+% Tensor de inércia do lander após liberação do rover
+J_lander = diag([1650.17, 1258.86, 2248.96]);
+
+% Posições dos propulsores (m)
+p1 = [1.83; -1.83; -0.198];
+p2 = [1.83; 1.83; -0.198];
+p3 = [-1.83; -1.83; -0.198];
+p4 = [-1.83; 1.83; -0.198];
+
+% Condições iniciais
+pos = [0; 0; -26]; % Posição inicial para hover (m)
+vel = [0; 0; 0];    % Velocidade inicial (m/s)
+euler = [0; 0; 0];   % Ângulos de Euler (rad)
+omega = [0; 0; 0];   % Velocidade angular inicial (rad/s)
+
+% Tempo de simulação
+dt = 0.01; % Passo de tempo (s)
+t_final = 50; % Tempo total de simulação (s)
+t = 0:dt:t_final;
+
+% Inicialização de vetores de estado
+pos_hist = zeros(3, length(t));
+vel_hist = zeros(3, length(t));
+euler_hist = zeros(3, length(t));
+omega_hist = zeros(3, length(t));
+m_hist = zeros(1, length(t));
+
+% Massa inicial
+current_mass = m_lander;
+m_hist(1) = current_mass;
+
+% Função de matriz de rotação para gravidade
+R_transpose = @(lambda) [cos(lambda), 0, -sin(lambda);
+                         0, 1, 0;
+                         sin(lambda), 0, cos(lambda)];
+
+% Simulação
+for i = 1:length(t)
+    % Calcular gravidade
+    lambda = euler(2); % Usar ângulo de pitch para calcular a rotação
+    fg = current_mass * g * R_transpose(lambda)' * [0; 0; 1];
+    
+    % Calcular força de arrasto
+    drag_force = -(1/2) * rho * A * Cd * norm(vel)^2 * (vel / (norm(vel) + 1e-6));
+    
+    if t(i) <= 10
+        % Hover e libertação do Rover (até t = 10 s)
+        if t(i) == 10
+            current_mass = m_lander - m_rover; % Reduzir massa após liberação do Rover
+            J = J_lander; % Atualizar tensor de inércia
+        end
+        fp = [0; 0; current_mass * g]; % Compensar gravidade no eixo z
+    elseif t(i) > 10 && t(i) <= 30
+        % Manobra de afastamento (10 s < t <= 30 s)
+        if vel(2) < 2.4
+            fp = [0; 500; current_mass * g]; % Força horizontal no eixo y
+        else
+            fp = [0; 0; current_mass * g]; % Manter velocidade máxima em y
+        end
+    elseif t(i) > 30 && abs(vel(2)) > 0
+        % Transição para descida vertical (desacelerar y para zero)
+        fp = [0; -current_mass * vel(2) / dt; current_mass * g]; % Desacelerar eixo y
+    else
+        % Aterragem controlada (t > 30 s e v_y = 0)
+        fp = [0; 0; current_mass * g - 1000]; % Movimento no eixo z
+    end
+
+    % Adicionar forças de gravidade e arrasto
+    total_force = fp + drag_force - fg;
+
+    % Momentos propulsivos (mantendo o controle estável)
+    np = [0; 0; 0];
+
+    % Atualização da aceleração linear e angular
+    acc = total_force / current_mass;
+    alpha = J \ (np - cross(omega, J * omega));
+
+    % Integração numérica
+    vel = vel + acc * dt;
+    pos = pos + vel * dt;
+    omega = omega + alpha * dt;
+    euler = euler + omega * dt; % Aproximação simples
+
+    % Armazenar históricos
+    pos_hist(:, i) = pos;
+    vel_hist(:, i) = vel;
+    euler_hist(:, i) = euler;
+    omega_hist(:, i) = omega;
+    m_hist(i) = current_mass;
+end
+
+% Gráficos
+figure;
+plot3(pos_hist(1, :), pos_hist(2, :), pos_hist(3, :));
+xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
+title('Trajetória 3D do Lander'); grid on;
+
+figure;
+subplot(3, 1, 1); plot(t, pos_hist(1, :)); xlabel('Tempo (s)'); ylabel('Posição X (m)');
+subplot(3, 1, 2); plot(t, pos_hist(2, :)); xlabel('Tempo (s)'); ylabel('Posição Y (m)');
+subplot(3, 1, 3); plot(t, pos_hist(3, :)); xlabel('Tempo (s)'); ylabel('Posição Z (m)');
+title('Posição vs. Tempo');
+
+figure;
+subplot(3, 1, 1); plot(t, vel_hist(1, :)); xlabel('Tempo (s)'); ylabel('Velocidade X (m/s)');
+subplot(3, 1, 2); plot(t, vel_hist(2, :)); xlabel('Tempo (s)'); ylabel('Velocidade Y (m/s)');
+subplot(3, 1, 3); plot(t, vel_hist(3, :)); xlabel('Tempo (s)'); ylabel('Velocidade Z (m/s)');
+title('Velocidade vs. Tempo');
+
+figure;
+plot(t, m_hist);
+xlabel('Tempo (s)'); ylabel('Massa (kg)');
+title('Massa do Lander vs. Tempo'); grid on;
