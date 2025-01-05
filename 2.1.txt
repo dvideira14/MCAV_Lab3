@@ -1,0 +1,120 @@
+% Initialize Variables
+current_state = 'Takeoff'; % Initial state
+total_time = 100; % Total simulation time in seconds
+Dt = 0.1; % Time step
+t = 0:Dt:total_time; % Time vector
+n_sim = length(t);
+
+% System Parameters
+m = 100; % Vehicle mass (kg)
+g = 9.81; % Gravity (m/s^2)
+altitude = 0; % Initial altitude (m)
+velocity = [0; 0; 0]; % Initial velocity [vx; vy; vz] in m/s
+thrust = zeros(4, n_sim); % Thrust vector [T1; T2; T3; T4]
+
+% References
+ref_altitude = 300; % Reference altitude (m)
+ref_velocity = [100; 0; 0]; % Reference velocity [vx_ref, vy_ref, vz_ref]
+
+% Controller Gains
+Kp_altitude = 5; % Proportional gain for altitude
+Kp_vz = 10; % Proportional gain for vertical velocity
+Kp_vx = 2; % Proportional gain for horizontal velocity (vx)
+Kp_vy = 2; % Proportional gain for horizontal velocity (vy)
+
+% Results
+altitudes = zeros(1, n_sim);
+velocities = zeros(3, n_sim);
+states = cell(1, n_sim);
+
+% Initialize Results
+altitudes(1) = altitude;
+velocities(:, 1) = velocity;
+
+% State Machine
+for k = 1:n_sim-1
+    % Store Current State
+    states{k} = current_state;
+
+    % Thrust Controllers
+    switch current_state
+        case 'Takeoff'
+            altitude_error = ref_altitude - altitudes(k);
+            total_thrust = Kp_altitude * altitude_error + m * g; % Required thrust to reach altitude
+            thrust(:, k) = total_thrust / 4 * ones(4, 1); % Equally distributed among engines
+
+            if altitudes(k) >= ref_altitude
+                current_state = 'Cruise';
+            end
+
+        case 'Cruise'
+            % Control for horizontal velocity (vx and vy)
+            vx_error = ref_velocity(1) - velocities(1, k);
+            vy_error = ref_velocity(2) - velocities(2, k);
+            thrust_x = Kp_vx * vx_error; % Proportional control for vx
+            thrust_y = Kp_vy * vy_error; % Proportional control for vy
+
+            % Adjusted total thrust
+            thrust(:, k) = [1500 + thrust_x + thrust_y; 
+                            1500 - thrust_x + thrust_y; 
+                            1500 - thrust_x - thrust_y; 
+                            1500 + thrust_x - thrust_y];
+            
+            if altitudes(k) <= 150
+                current_state = 'Approach';
+            end
+
+        case 'Approach'
+            altitude_error = 150 - altitudes(k); % Approach 150 meters
+            total_thrust = Kp_vz * altitude_error + m * g;
+            thrust(:, k) = total_thrust / 4 * ones(4, 1);
+
+            if altitudes(k) <= 50
+                current_state = 'Landing';
+            end
+
+        case 'Landing'
+            thrust(:, k) = [0; 0; 0; 0]; % Cut off all thrust
+    end
+
+    % Update Altitude and Velocity
+    accel_z = sum(thrust(:, k)) / m - g;
+    velocities(:, k+1) = velocities(:, k) + [0; 0; accel_z] * Dt;
+    altitudes(k+1) = altitudes(k) + velocities(3, k) * Dt;
+end
+
+% Truncate Vectors
+altitudes = altitudes(1:n_sim);
+velocities = velocities(:, 1:n_sim);
+thrust = thrust(:, 1:n_sim);
+t = t(1:n_sim);
+
+% Plots
+% Plot 1: Thrust
+figure;
+plot(t, thrust(1, :), 'b', t, thrust(2, :), 'r', t, thrust(3, :), 'g', t, thrust(4, :), 'm');
+xlabel('Time [s]');
+ylabel('Thrust [N]');
+title('Thrust');
+legend('T1', 'T2', 'T3', 'T4');
+grid on;
+
+% Plot 2: Altitude
+figure;
+plot(t, altitudes, 'b', t, ref_altitude * ones(size(t)), 'r--');
+xlabel('Time [s]');
+ylabel('Altitude [m]');
+title('Altitude');
+legend('Altitude', 'Reference Altitude');
+grid on;
+
+% Plot 3: Velocity
+figure;
+plot(t, velocities(1, :), 'b', t, ref_velocity(1) * ones(size(t)), 'b--', ...
+     t, velocities(2, :), 'r', t, ref_velocity(2) * ones(size(t)), 'r--', ...
+     t, velocities(3, :), 'g', t, ref_velocity(3) * ones(size(t)), 'g--');
+xlabel('Time [s]');
+ylabel('Velocity [m/s]');
+title('Velocity');
+legend('vx', 'Reference vx', 'vy', 'Reference vy', 'vz', 'Reference vz');
+grid on;
